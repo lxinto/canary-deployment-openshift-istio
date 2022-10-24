@@ -1,0 +1,85 @@
+this is a documentation for canary deployment on k8s/openshift
+using istio service mesh
+
+-- by Luka Khintibidze 
+
+*disclaimer: im not an expert in the field, but the opposite. 
+this is my second attempt at canary deployment which happened to work
+as intended. this is exactly why i decided to upload my solution to github
+to use this later as a template for my next projects.*
+
+structure: 
+
+1. have 2 docker images of the same app but of different versions (preferably with noticable 
+visual differences so its easier to visualise our canary deployment result)
+
+2. create a service as you would for normal deployment, in spec: i also included type: NodePort 
+
+3. create two deployments. one for each version of the app. 
+name deployments like [app:version] respective to their docker image version
+and include version number in the labels as well. 
+
+example: 
+
+    metadata:
+    name: [app:version]
+    namespace: [namespace]
+    labels:
+        version: v1
+    annotations:
+        sidecar.istio.io/inject: 'true'
+
+also make sure to include  sidecar.istio.io/inject: 'true'  if istio is
+not included in your desired namespace by default
+
+4. once done writing the config files apply them by 
+
+for k8s
+kubectl apply -f filename.yaml
+
+for openshift
+oc apply -f filename.yaml
+
+if everything was done right in the cli you should see the output of:
+
+[filename] was created 
+
+moving on to istio's config files
+
+5. create a default ingress gateway
+
+6. create a virtual service, but in spec we need to include destinations for every
+version of the app we are deploying. we also need to include weight for every destination.
+weight is the same as %, so if we specify weight: 60 for app-v1 and weight: 40 app-v2 this means
+60% of traffic will go to app-v1 and 40% to app-v2
+
+example:
+
+  spec:
+    hosts:
+    - "*"
+    gateways:
+    - gatewayname
+    http:
+    - route:
+        - destination:
+            host: 
+            subset: v1
+        weight: 60
+        - destination:
+            host: 
+            subset: v2
+        weight: 40
+
+7. after the virtual service we will need to create a destination rule. the purpose of 
+destination rule is to manage incoming traffic and send it to desired destination.
+
+8. now apply istio config files
+
+9. test canary deployment by going to the ip of your app
+
+you can check the ip and port by: 
+
+        oc get pods -o wide
+        oc get service -o wide
+
